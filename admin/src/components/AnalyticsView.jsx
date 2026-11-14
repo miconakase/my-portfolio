@@ -4,6 +4,7 @@ import { api } from '../api'
 const RANGES = [7, 14, 30]
 
 const fmt = (n) => (n ?? 0).toLocaleString()
+const plural = (n, word) => `${fmt(n)} ${word}${n === 1 ? '' : 's'}`
 const dayLabel = (ts) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
 // Visitors and page views from Vercel Web Analytics
@@ -86,7 +87,7 @@ function DailyChart({ rows }) {
             <span className="font-semibold">{dayLabel(shown.timestamp)}</span>
             <span className="text-(--color-muted)">
               {' '}
-              · {fmt(shown.visitors)} visitors · {fmt(shown.pageviews)} views
+              · {plural(shown.visitors, 'visitor')} · {plural(shown.pageviews, 'view')}
             </span>
           </p>
         )}
