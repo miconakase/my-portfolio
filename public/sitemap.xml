@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Project pages live at #/works/<slug>, which search engines treat as the same page, so only the home page is listed -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.miconakase.xyz/</loc>
+  </url>
+</urlset>
