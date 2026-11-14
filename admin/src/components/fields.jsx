@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import { uploadFile } from '../api'
+import { rowKey } from '../lib/formValues'
 import { thumb } from '../lib/thumb'
 
 // Label + hint wrapper shared by every input
@@ -17,7 +18,8 @@ function FieldShell({ field, htmlFor, children }) {
 }
 
 // Upload a file to Cloudinary, or paste a URL. Shows a preview of what's set.
-function MediaInput({ value, onChange, kind, folder, id }) {
+// `onUploading(+1 / -1)` lets the form hold off saving until uploads finish.
+function MediaInput({ value, onChange, onUploading, kind, folder, id }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
@@ -27,12 +29,14 @@ function MediaInput({ value, onChange, kind, folder, id }) {
     if (!file) return
     setUploading(true)
     setError('')
+    onUploading?.(1)
     try {
       onChange(await uploadFile(file, folder))
     } catch (err) {
       setError(err.message)
     } finally {
       setUploading(false)
+      onUploading?.(-1)
     }
   }
 
@@ -84,34 +88,39 @@ function CreditsInput({ value, onChange, roles }) {
   )
 }
 
-// Editable list of rows; `renderRow` draws the inputs for one row
+// Editable list of rows; `renderRow` draws the inputs for one row.
+// Every change goes through an updater on the latest rows, matched by row key, so an
+// upload finishing late can't overwrite edits made to other rows in the meantime.
 function RowList({ rows, onChange, blank, addLabel, renderRow }) {
-  const update = (i, patch) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
-  const move = (i, to) => {
-    const next = [...rows]
-    ;[next[i], next[to]] = [next[to], next[i]]
-    onChange(next)
-  }
+  const update = (key, patch) => onChange((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  const move = (key, dir) =>
+    onChange((prev) => {
+      const i = prev.findIndex((r) => r.key === key)
+      const next = [...prev]
+      ;[next[i], next[i + dir]] = [next[i + dir], next[i]]
+      return next
+    })
   return (
     <div className="flex flex-col gap-3">
       {rows.map((row, i) => (
-        <div key={i} className="flex gap-3 items-start p-3 border-2 border-(--color-ink) bg-(--color-sunken)">
-          <div className="flex-1 min-w-0 flex flex-col gap-2">{renderRow(row, (patch) => update(i, patch))}</div>
+        <div key={row.key} className="flex gap-3 items-start p-3 border-2 border-(--color-ink) bg-(--color-sunken)">
+          <div className="flex-1 min-w-0 flex flex-col gap-2">{renderRow(row, (patch) => update(row.key, patch))}</div>
           <div className="flex flex-col gap-1.5 shrink-0">
-            <button type="button" className="nb-btn nb-btn-sm" disabled={i === 0} onClick={() => move(i, i - 1)} aria-label="Move up">▲</button>
-            <button type="button" className="nb-btn nb-btn-sm" disabled={i === rows.length - 1} onClick={() => move(i, i + 1)} aria-label="Move down">▼</button>
-            <button type="button" className="nb-btn nb-btn-sm nb-btn-red" onClick={() => onChange(rows.filter((_, j) => j !== i))} aria-label="Remove">✕</button>
+            <button type="button" className="nb-btn nb-btn-sm" disabled={i === 0} onClick={() => move(row.key, -1)} aria-label="Move up">▲</button>
+            <button type="button" className="nb-btn nb-btn-sm" disabled={i === rows.length - 1} onClick={() => move(row.key, 1)} aria-label="Move down">▼</button>
+            <button type="button" className="nb-btn nb-btn-sm nb-btn-red" onClick={() => onChange((prev) => prev.filter((r) => r.key !== row.key))} aria-label="Remove">✕</button>
           </div>
         </div>
       ))}
-      <button type="button" className="nb-btn nb-press self-start" onClick={() => onChange([...rows, blank])}>
+      <button type="button" className="nb-btn nb-press self-start" onClick={() => onChange((prev) => [...prev, { ...blank, key: rowKey() }])}>
         + {addLabel}
       </button>
     </div>
   )
 }
 
-export function Field({ field, value, onChange }) {
+// `onChange` takes a value or an updater function (prev → next), like setState
+export function Field({ field, value, onChange, onUploading }) {
   const id = useId()
 
   let input
@@ -142,7 +151,9 @@ export function Field({ field, value, onChange }) {
       break
     case 'image':
     case 'audio':
-      input = <MediaInput id={id} value={value} onChange={onChange} kind={field.type} folder={field.folder} />
+      input = (
+        <MediaInput id={id} value={value} onChange={onChange} onUploading={onUploading} kind={field.type} folder={field.folder} />
+      )
       break
     case 'credits':
       input = <CreditsInput value={value} onChange={onChange} roles={field.roles} />
@@ -172,7 +183,7 @@ export function Field({ field, value, onChange }) {
           addLabel="Add screenshot"
           renderRow={(row, set) => (
             <>
-              <MediaInput value={row.src} onChange={(src) => set({ src })} kind="image" folder={field.folder} />
+              <MediaInput value={row.src} onChange={(src) => set({ src })} onUploading={onUploading} kind="image" folder={field.folder} />
               <input className="nb-input" placeholder="Caption" value={row.caption} onChange={(e) => set({ caption: e.target.value })} />
             </>
           )}

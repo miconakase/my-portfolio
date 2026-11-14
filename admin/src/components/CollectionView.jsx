@@ -62,6 +62,7 @@ export default function CollectionView({ section, onError }) {
 
   // Swap two items, then save `order` = position for anything that moved
   const move = async (from, to) => {
+    if (busy) return // one reorder at a time, or two batches of saves can race
     const next = [...items]
     ;[next[from], next[to]] = [next[to], next[from]]
     setItems(next)
@@ -132,8 +133,8 @@ export default function CollectionView({ section, onError }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className="hidden sm:flex flex-col gap-1">
-                <button className="nb-btn nb-btn-sm" disabled={i === 0} onClick={() => move(i, i - 1)} aria-label="Move up">▲</button>
-                <button className="nb-btn nb-btn-sm" disabled={i === items.length - 1} onClick={() => move(i, i + 1)} aria-label="Move down">▼</button>
+                <button className="nb-btn nb-btn-sm" disabled={busy || i === 0} onClick={() => move(i, i - 1)} aria-label="Move up">▲</button>
+                <button className="nb-btn nb-btn-sm" disabled={busy || i === items.length - 1} onClick={() => move(i, i + 1)} aria-label="Move down">▼</button>
               </div>
               <button className="nb-btn nb-btn-sm nb-press" onClick={() => open(item)}>Edit</button>
               <button className="nb-btn nb-btn-sm nb-btn-red nb-press" onClick={() => onDelete(item)}>Delete</button>

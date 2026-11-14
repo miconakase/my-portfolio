@@ -3,12 +3,12 @@
 // DELETE /api/:collection/:id  delete an item (admin)
 import { getDb, ObjectId } from '../_lib/db.js'
 import { requireAdmin } from '../_lib/auth.js'
-import { COLLECTIONS, missingFields } from '../_lib/collections.js'
+import { collectionConfig, invalidFields } from '../_lib/collections.js'
 import { cleanBody, handle, methodNotAllowed } from '../_lib/http.js'
 
 export default handle(async (req, res) => {
   const { collection: name, id } = req.query
-  const config = COLLECTIONS[name]
+  const config = collectionConfig(name)
   if (!config) return res.status(404).json({ error: 'Unknown collection' })
   if (!ObjectId.isValid(id)) return res.status(404).json({ error: 'Not found' })
   const col = (await getDb()).collection(name)
@@ -23,15 +23,15 @@ export default handle(async (req, res) => {
     if (!requireAdmin(req, res)) return
     const data = cleanBody(req.body)
     if (!data) return res.status(400).json({ error: 'Expected a JSON object' })
-    const missing = missingFields(config, data)
-    if (missing.length) return res.status(400).json({ error: `Missing: ${missing.join(', ')}` })
+    const invalid = invalidFields(config, data)
+    if (invalid) return res.status(400).json({ error: invalid })
 
     const existing = await col.findOne({ _id })
     if (!existing) return res.status(404).json({ error: 'Not found' })
     // Keep the slug and order unless the admin sends new ones, so URLs don't break on rename
     const item = {
       ...data,
-      ...(config.slug && { slug: data.slug || existing.slug }),
+      ...(config.slug && { slug: (typeof data.slug === 'string' && data.slug) || existing.slug }),
       order: data.order ?? existing.order,
       createdAt: existing.createdAt,
       updatedAt: new Date(),

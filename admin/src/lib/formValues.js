@@ -10,6 +10,10 @@ const splitLines = (text) =>
 
 const asArray = (value) => (Array.isArray(value) ? value : value ? [value] : [])
 
+// Form-only id for link/gallery rows, so edits find the right row even after
+// rows move or are removed (e.g. while a screenshot is still uploading). Not saved.
+export const rowKey = () => crypto.randomUUID()
+
 export function toForm(field, value) {
   switch (field.type) {
     case 'checkbox':
@@ -21,9 +25,9 @@ export function toForm(field, value) {
     case 'credits':
       return Object.fromEntries(field.roles.map((role) => [role, asArray(value?.[role]).join('\n')]))
     case 'links':
-      return (value ?? []).map((l) => ({ label: l.label ?? '', url: l.url ?? '' }))
+      return (value ?? []).map((l) => ({ key: rowKey(), label: l.label ?? '', url: l.url ?? '' }))
     case 'gallery':
-      return (value ?? []).map((g) => ({ src: g.src ?? '', caption: g.caption ?? '' }))
+      return (value ?? []).map((g) => ({ key: rowKey(), src: g.src ?? '', caption: g.caption ?? '' }))
     default:
       return value == null ? '' : String(value)
   }
