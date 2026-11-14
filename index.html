@@ -38,6 +38,11 @@
         ]
       }
     </script>
+    <!-- api/page.js puts a plain copy of the content inside #root for crawlers. It's the same
+         content the app renders, kept invisible for the moment before React replaces it. -->
+    <style>
+      .prerender { opacity: 0; }
+    </style>
     <script>
       (function () {
         try {

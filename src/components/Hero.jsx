@@ -67,14 +67,15 @@ export default function Hero() {
         </div>
 
         <div ref={scrollWrapperRef} className="relative z-2 flex flex-col items-center will-change-[transform,opacity]">
-          <div className="flex flex-col items-center leading-[1.05] gap-[2vw]">
+          {/* The page's main heading for search engines and screen readers */}
+          <h1 className="flex flex-col items-center leading-[1.05] gap-[2vw] m-0 font-normal">
             <span ref={micoRef} className="hero-text uppercase whitespace-nowrap" style={{ fontSize: '12vw' }}>
               MICO
             </span>
             <span ref={nakaseRef} className="hero-text uppercase whitespace-nowrap" style={{ fontSize: '12vw' }}>
               NAKASE
             </span>
-          </div>
+          </h1>
 
           {/* Click / Enter / Space advances the dialog, like the games */}
           <div
