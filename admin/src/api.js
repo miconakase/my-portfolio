@@ -29,6 +29,7 @@ export const api = {
   create: (collection, item) => request(`/${collection}`, { method: 'POST', body: item }),
   update: (collection, id, item) => request(`/${collection}/${id}`, { method: 'PUT', body: item }),
   remove: (collection, id) => request(`/${collection}/${id}`, { method: 'DELETE' }),
+  analytics: (days) => request(`/analytics?days=${days}`),
 }
 
 // Uploads straight from the browser to Cloudinary with a signature from our API,

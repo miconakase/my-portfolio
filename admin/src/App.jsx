@@ -3,11 +3,15 @@ import { api } from './api'
 import { SECTIONS } from './schema'
 import Login from './components/Login'
 import CollectionView from './components/CollectionView'
+import AnalyticsView from './components/AnalyticsView'
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://www.miconakase.xyz'
 
+// Analytics is a read-only tab after the content sections
+const TABS = [...SECTIONS, { key: 'analytics', label: 'Analytics' }]
+
 // Remember the open section across refreshes via #music, #projects, …
-const sectionFromHash = () => SECTIONS.find((s) => `#${s.key}` === window.location.hash) ?? SECTIONS[0]
+const sectionFromHash = () => TABS.find((s) => `#${s.key}` === window.location.hash) ?? TABS[0]
 
 export default function App() {
   const [auth, setAuth] = useState('checking') // 'checking' | 'in' | 'out'
@@ -58,7 +62,7 @@ export default function App() {
           </div>
         </div>
         <nav className="max-w-5xl mx-auto px-4 pb-3 flex gap-2 overflow-x-auto">
-          {SECTIONS.map((s) => (
+          {TABS.map((s) => (
             <button
               key={s.key}
               className={`nb-btn nb-btn-sm nb-press ${s.key === section.key ? 'nb-btn-yellow' : ''}`}
@@ -78,7 +82,11 @@ export default function App() {
             <button className="nb-btn nb-btn-sm" onClick={() => setError('')}>Dismiss</button>
           </p>
         )}
-        <CollectionView key={section.key} section={section} onError={onError} />
+        {section.key === 'analytics' ? (
+          <AnalyticsView onError={onError} />
+        ) : (
+          <CollectionView key={section.key} section={section} onError={onError} />
+        )}
       </main>
     </div>
   )
