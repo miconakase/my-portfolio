@@ -106,7 +106,7 @@ export default function Timeline({ journey }) {
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className={`nb-chip border-(--color-ink) ${type.badge}`}>{type.label}</span>
-                    {spotlight && <span className="nb-chip bg-(--color-ink) text-(--color-yellow) border-(--color-ink)">★ Now</span>}
+                    {spotlight && <span className="nb-chip bg-[#111] text-(--color-yellow) border-[#111]">★ Now</span>}
                     <span className={`font-pixel text-[8px] uppercase ${spotlight ? '' : 'text-(--color-muted)'}`}>{entry.date}</span>
                   </div>
                   <h3

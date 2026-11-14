@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { complete, runCommand } from '../lib/terminal'
+import { useModal } from '../hooks/useModal'
 
 const WELCOME = [
   { text: 'MICO OS v1.0 — portfolio terminal', tone: 'accent' },
@@ -43,9 +44,9 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onOpen, onClose])
 
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open])
+  // Esc is handled by the shortcut listener above
+  const dialogRef = useRef(null)
+  useModal(dialogRef, onClose, { active: open, escape: false })
 
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight)
@@ -95,6 +96,7 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
   return (
     <div className="fixed inset-0 z-[1002] bg-black/60 flex items-center justify-center p-4 animate-menu-fade" onClick={onClose}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Terminal"
@@ -144,6 +146,7 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
             </span>
             <input
               ref={inputRef}
+              data-autofocus
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onInputKey}

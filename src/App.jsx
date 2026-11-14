@@ -20,6 +20,9 @@ const SECTION_IDS = ['hero', 'about', 'works', 'timeline', 'skills', 'contact']
 // Never hold the loading screen longer than this waiting on content
 const CONTENT_TIMEOUT = 8000
 
+// The pixel cursor only makes sense with a real mouse; phones and tablets keep their own
+const FINE_POINTER = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
 // Project detail pages live at #/works/<slug> so back, refresh and sharing all work
 const slugFromHash = () => window.location.hash.match(/^#\/works\/(.+)$/)?.[1] ?? null
 
@@ -46,16 +49,24 @@ function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  // Opening a project starts at its top; closing one returns to the Works section
+  // Opening a project starts at its top; closing one returns to the Works section.
+  // 'instant' overrides the page's smooth scrolling, which would visibly slide there.
   useEffect(() => {
-    if (selectedWork) window.scrollTo(0, 0)
-    else if (wasOpen.current) requestAnimationFrame(() => document.getElementById('works')?.scrollIntoView())
+    if (selectedWork) window.scrollTo({ top: 0, behavior: 'instant' })
+    else if (wasOpen.current)
+      requestAnimationFrame(() => document.getElementById('works')?.scrollIntoView({ behavior: 'instant' }))
     wasOpen.current = selectedWork !== null
   }, [selectedWork])
 
   const openWork = (work) => {
+    const hash = `#/works/${work.slug}`
+    // Already on a project (opened from the terminal): swap it so Back still returns to the page
+    if (selectedSlug) {
+      window.location.replace(hash)
+      return
+    }
     openedFromList.current = true
-    window.location.hash = `/works/${work.slug}`
+    window.location.hash = hash
   }
 
   const closeWork = () => {
@@ -146,6 +157,7 @@ function App() {
           worksTab={worksTab}
           onTabChange={setWorksTab}
           onSelectWork={openWork}
+          pageHidden={selectedWork !== null}
         />
         <Timeline journey={content.journey} />
         <Skills party={content.skills.party} box={content.skills.box} boxCount={content.skills.boxCount} />
@@ -159,7 +171,7 @@ function App() {
         </ErrorBoundary>
       </div>
       <Terminal open={terminalOpen} onOpen={openTerminal} onClose={closeTerminal} ctx={terminalCtx} />
-      <Cursor />
+      {FINE_POINTER && <Cursor />}
     </>
   )
 }

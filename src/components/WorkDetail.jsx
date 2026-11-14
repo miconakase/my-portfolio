@@ -1,39 +1,41 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { techIcons } from '../constants/techIcons'
+import { useModal } from '../hooks/useModal'
 import Icon from './Icon'
 
 const NAV_BTN =
   'flex items-center justify-center w-10 h-10 shrink-0 bg-(--color-surface) text-(--color-text) border-[3px] border-(--color-ink) shadow-brutal cursor-pointer'
 
+// Captions are optional, so fall back to the screenshot's position
+const shotLabel = (shot, i) => shot.caption || `Screenshot ${i + 1}`
+
 function Lightbox({ shots, index, onIndex, onClose }) {
   const shot = shots[index]
   const many = shots.length > 1
+  const dialogRef = useRef(null)
+  useModal(dialogRef, onClose)
 
   useEffect(() => {
+    if (!many) return
     const step = (dir) => onIndex((index + dir + shots.length) % shots.length)
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
-      else if (many && e.key === 'ArrowLeft') step(-1)
-      else if (many && e.key === 'ArrowRight') step(1)
+      if (e.key === 'ArrowLeft') step(-1)
+      else if (e.key === 'ArrowRight') step(1)
     }
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = prevOverflow
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [index, many, shots.length, onIndex, onClose])
+    return () => window.removeEventListener('keydown', onKey)
+  }, [index, many, shots.length, onIndex])
 
   const go = (dir) => onIndex((index + dir + shots.length) % shots.length)
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[1001] bg-black/75 flex items-center justify-center p-4 animate-menu-fade"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={shot.caption}
+      aria-label={shotLabel(shot, index)}
     >
       <figure className="relative m-0 w-full max-w-[1200px]" onClick={(e) => e.stopPropagation()}>
         <button className={`${NAV_BTN} absolute -top-3 -right-3 z-1 max-sm:top-2 max-sm:right-2`} onClick={onClose} aria-label="Close">
@@ -41,7 +43,7 @@ function Lightbox({ shots, index, onIndex, onClose }) {
         </button>
         <img
           src={shot.src}
-          alt={shot.caption}
+          alt={shotLabel(shot, index)}
           className="block w-full max-h-[calc(100vh-140px)] object-contain bg-(--color-surface) border-[3px] border-(--color-ink) shadow-brutal-lg"
         />
         <figcaption className="flex items-center gap-4 mt-4 text-white text-[15px]">
@@ -138,16 +140,16 @@ export default function WorkDetail({ work, onBack }) {
                 <h2 className="nb-eyebrow text-(--color-text) m-0 mb-6">Screenshots</h2>
                 <div className="grid grid-cols-2 gap-6 max-sm:grid-cols-1">
                   {work.gallery.map((shot, i) => (
-                    <figure key={shot.caption} className="m-0">
+                    <figure key={shot.src} className="m-0">
                       <button
                         type="button"
                         onClick={() => setOpenShot(i)}
-                        aria-label={`View ${shot.caption}`}
+                        aria-label={`View ${shotLabel(shot, i)}`}
                         className="block w-full p-0 nb-box shadow-brutal overflow-hidden cursor-pointer transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5"
                       >
-                        <img src={shot.src} alt={shot.caption} className="w-full aspect-[16/10] object-cover block" loading="lazy" />
+                        <img src={shot.src} alt={shotLabel(shot, i)} className="w-full aspect-[16/10] object-cover block" loading="lazy" />
                       </button>
-                      <figcaption className="mt-3 text-[14px] text-(--color-muted)">{shot.caption}</figcaption>
+                      {shot.caption && <figcaption className="mt-3 text-[14px] text-(--color-muted)">{shot.caption}</figcaption>}
                     </figure>
                   ))}
                 </div>

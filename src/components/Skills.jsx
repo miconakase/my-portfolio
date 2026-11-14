@@ -18,10 +18,12 @@ function PartyCard({ tool }) {
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-2">
-          <span className="nb-chip text-[7px] bg-(--color-surface)">{tool.category}</span>
-          <span className="font-pixel text-[7px] uppercase text-(--color-muted) group-hover:text-(--color-on-accent)">
-            Since {formatSince(tool.startDate)}
-          </span>
+          {tool.category && <span className="nb-chip text-[7px] bg-(--color-surface)">{tool.category}</span>}
+          {tool.startDate && (
+            <span className="font-pixel text-[7px] uppercase text-(--color-muted) group-hover:text-(--color-on-accent)">
+              Since {formatSince(tool.startDate)}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -33,7 +35,7 @@ function BoxChip({ tool }) {
   return (
     <span
       className="flex items-center gap-2 px-3 py-2 border-2 border-(--color-ink) bg-(--color-surface) text-[14px] font-semibold transition-colors duration-150 hover:bg-(--color-yellow) hover:text-(--color-on-accent)"
-      title={`${tool.category} · since ${formatSince(tool.startDate)}`}
+      title={[tool.category, tool.startDate && `since ${formatSince(tool.startDate)}`].filter(Boolean).join(' · ')}
     >
       <img src={tool.icon} alt="" className="w-[18px] h-[18px]" loading="lazy" />
       {tool.name}
@@ -75,7 +77,8 @@ export default function Skills({ party, box, boxCount }) {
 
         {/* PC Box: everything else, compact */}
         <div className={`mt-14 border-[3px] border-(--color-ink) bg-(--color-surface) shadow-brutal ${revealClass(visible, '0.3s')}`}>
-          <div className="flex items-center justify-between gap-3 px-5 py-3 bg-(--color-ink) text-(--color-bg)">
+          {/* Fixed dark bar (not --color-ink, which turns light in dark mode) so the yellow count stays readable */}
+          <div className="flex items-center justify-between gap-3 px-5 py-3 bg-[#111] text-[#fffbea]">
             <span className="font-pixel text-[11px] uppercase">PC Box</span>
             <span className="font-pixel text-[8px] uppercase text-(--color-yellow)">{boxCount} stored</span>
           </div>

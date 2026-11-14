@@ -62,11 +62,13 @@ export default function Contact() {
             </div>
             <div className="mb-6">
               <textarea
-                className={`nb-input resize-y min-h-[140px] leading-[1.6] ${showTypewriter ? 'text-(--color-muted)' : ''}`}
+                className="nb-input resize-y min-h-[140px] leading-[1.6]"
                 name="message"
                 rows="5"
                 aria-label="Message"
-                value={showTypewriter ? typewriterText : formData.message}
+                // The sample text is only a placeholder, so `required` still catches an empty message
+                placeholder={showTypewriter ? typewriterText : ''}
+                value={formData.message}
                 onChange={handleChange}
                 onFocus={() => setMessageFocused(true)}
                 onBlur={() => setMessageFocused(false)}

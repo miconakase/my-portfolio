@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useInView } from '../hooks/useInView'
+import { useModal } from '../hooks/useModal'
 import { revealClass, staggerStyle } from '../lib/utils'
 import { techIcons } from '../constants/techIcons'
 import Icon from './Icon'
@@ -79,7 +81,7 @@ function Cartridge({ work, featured, onSelect }) {
         <div className="flex-1 flex flex-col gap-3 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {featured && <span className="nb-chip bg-(--color-yellow) text-(--color-on-accent)">★ Featured</span>}
-            <span className="nb-chip">{work.year}</span>
+            {work.year && <span className="nb-chip">{work.year}</span>}
             {work.role && <span className="nb-chip bg-(--color-sunken)">{work.role}</span>}
           </div>
           <h3
@@ -88,7 +90,7 @@ function Cartridge({ work, featured, onSelect }) {
           >
             {work.title}
           </h3>
-          <p className="m-0 text-(--color-muted) text-[15px] leading-relaxed">{featured ? work.longDesc : work.desc}</p>
+          <p className="m-0 text-(--color-muted) text-[15px] leading-relaxed">{featured ? work.longDesc || work.desc : work.desc}</p>
           {work.outcome && (
             <p className="m-0 text-[14px] font-semibold">
               <span className="text-(--color-green)">▲</span> {work.outcome}
@@ -131,6 +133,8 @@ function TrackCover({ track, className, noteSize }) {
 }
 
 function TrackCard({ track, active, playing, onPlay, onDetails }) {
+  // Tracks without an MP3 yet open their details instead of playing
+  const playable = Boolean(track.audio)
   return (
     <article className="flex flex-col gap-3">
       <div className="relative">
@@ -138,8 +142,8 @@ function TrackCard({ track, active, playing, onPlay, onDetails }) {
           className={`relative block w-full aspect-square border-[3px] border-(--color-ink) overflow-hidden cursor-pointer group transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 ${
             active ? 'shadow-brutal-lg' : 'shadow-brutal'
           }`}
-          onClick={onPlay}
-          aria-label={`${active && playing ? 'Pause' : 'Play'} ${track.title}`}
+          onClick={playable ? onPlay : onDetails}
+          aria-label={playable ? `${active && playing ? 'Pause' : 'Play'} ${track.title}` : `${track.title} details`}
         >
           <TrackCover track={track} className="w-full h-full" noteSize="text-6xl" />
           {active && <span className="absolute inset-0 border-[5px] border-(--color-yellow) pointer-events-none" aria-hidden="true" />}
@@ -149,9 +153,11 @@ function TrackCard({ track, active, playing, onPlay, onDetails }) {
               {track.award}
             </span>
           )}
-          <span className="absolute bottom-2 left-2 flex items-center justify-center w-11 h-11 bg-(--color-yellow) text-black border-[3px] border-black shadow-[3px_3px_0_0_#111] transition-transform duration-150 group-hover:scale-110">
-            <Icon name={active && playing ? 'pause' : 'play'} size={16} />
-          </span>
+          {playable && (
+            <span className="absolute bottom-2 left-2 flex items-center justify-center w-11 h-11 bg-(--color-yellow) text-black border-[3px] border-black shadow-[3px_3px_0_0_#111] transition-transform duration-150 group-hover:scale-110">
+              <Icon name={active && playing ? 'pause' : 'play'} size={16} />
+            </span>
+          )}
         </button>
         {/* sibling of the cover button, since buttons can't nest */}
         <button
@@ -179,7 +185,7 @@ function TrackCard({ track, active, playing, onPlay, onDetails }) {
           {active && <Equalizer playing={playing} />}
         </h3>
         <p className="m-0 mt-1 font-pixel text-[8px] uppercase text-(--color-muted) leading-[1.8]">
-          {track.genre} · {track.year}
+          {[track.genre, track.year].filter(Boolean).join(' · ')}
         </p>
       </div>
     </article>
@@ -202,6 +208,7 @@ const CREDIT_ROLES = [
 function useTrackLength(src) {
   const [length, setLength] = useState(null)
   useEffect(() => {
+    if (!src) return
     const probe = new Audio()
     probe.preload = 'metadata'
     probe.onloadedmetadata = () => setLength(probe.duration)
@@ -217,24 +224,16 @@ function useTrackLength(src) {
 // Detail popup for a track — playing from here drives the same player bar
 function TrackModal({ track, active, playing, onPlay, onClose }) {
   const length = useTrackLength(track.audio)
+  const dialogRef = useRef(null)
+  useModal(dialogRef, onClose)
   // skip Vocals when it just repeats the Artist
   const credits = CREDIT_ROLES.filter(
     ([key]) => track.credits?.[key] && !(key === 'vocals' && track.credits.vocals === track.credits.artist),
   )
 
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = prevOverflow
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [onClose])
-
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[1001] bg-black/60 flex items-center justify-center p-4 animate-menu-fade"
       onClick={onClose}
       role="dialog"
@@ -259,8 +258,8 @@ function TrackModal({ track, active, playing, onPlay, onClose }) {
             </h3>
             {track.credits?.artist && <p className="m-0 -mt-2 font-pixel text-[10px] uppercase text-(--color-muted)">{track.credits.artist}</p>}
             <div className="flex flex-wrap gap-2">
-              <span className="nb-chip bg-(--color-yellow) text-(--color-on-accent)">{track.year}</span>
-              <span className="nb-chip">{track.genre}</span>
+              {track.year && <span className="nb-chip bg-(--color-yellow) text-(--color-on-accent)">{track.year}</span>}
+              {track.genre && <span className="nb-chip">{track.genre}</span>}
               {length && <span className="nb-chip bg-(--color-sunken)">⏱ {formatTime(length)}</span>}
             </div>
             {track.award && (
@@ -268,12 +267,14 @@ function TrackModal({ track, active, playing, onPlay, onClose }) {
                 <span className="text-(--color-green)">▲</span> {track.award}
               </p>
             )}
-            <p className="m-0 text-(--color-text) text-[16px] leading-[1.8]">{track.longDesc}</p>
+            <p className="m-0 text-(--color-text) text-[16px] leading-[1.8]">{track.longDesc || track.desc}</p>
             <div className="flex flex-wrap gap-2.5 mt-auto pt-2">
-              <button className="nb-btn nb-btn-yellow nb-press px-4 py-2.5 text-[9px]" onClick={onPlay}>
-                <Icon name={active && playing ? 'pause' : 'play'} size={12} />
-                {active && playing ? 'Pause' : 'Play'}
-              </button>
+              {track.audio && (
+                <button className="nb-btn nb-btn-yellow nb-press px-4 py-2.5 text-[9px]" onClick={onPlay}>
+                  <Icon name={active && playing ? 'pause' : 'play'} size={12} />
+                  {active && playing ? 'Pause' : 'Play'}
+                </button>
+              )}
               {track.links?.map((link) => (
                 <a key={link.url} className="nb-btn nb-press px-4 py-2.5 text-[9px]" href={link.url} target="_blank" rel="noopener noreferrer">
                   ↗ {link.label}
@@ -305,7 +306,7 @@ function TrackModal({ track, active, playing, onPlay, onClose }) {
 }
 
 // Game Boy–style player bar that stays on screen once something has been played
-function PlayerBar({ track, playing, currentTime, duration, volume, onToggle, onSeek, onVolume, onClose }) {
+function PlayerBar({ track, playing, failed, currentTime, duration, volume, onToggle, onSeek, onVolume, onClose }) {
   const range =
     'h-1.5 appearance-none bg-white/25 cursor-pointer min-w-0 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-(--color-yellow) [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-none [&::-moz-range-thumb]:bg-(--color-yellow) [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-black'
 
@@ -322,8 +323,8 @@ function PlayerBar({ track, playing, currentTime, duration, volume, onToggle, on
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="font-pixel text-[9px] uppercase truncate">{track.title}</span>
-          <span className="font-pixel text-[8px] text-white/70 shrink-0">
-            {formatTime(currentTime)} / {formatTime(duration)}
+          <span className={`font-pixel text-[8px] shrink-0 ${failed ? 'text-[#ff7a5c]' : 'text-white/70'}`}>
+            {failed ? "Couldn't load track" : `${formatTime(currentTime)} / ${formatTime(duration)}`}
           </span>
         </div>
         <input type="range" min={0} max={duration || 0} step={0.1} value={currentTime} onChange={onSeek} className={`w-full ${range}`} aria-label="Seek" />
@@ -343,11 +344,13 @@ function PlayerBar({ track, playing, currentTime, duration, volume, onToggle, on
   )
 }
 
-export default function Works({ projects, music, loadFailed, worksTab, onTabChange, onSelectWork }) {
+// `pageHidden` = a project page is covering this section
+export default function Works({ projects, music, loadFailed, worksTab, onTabChange, onSelectWork, pageHidden }) {
   const visible = useInView('works', 0.1)
   const audioRef = useRef(null)
   const [trackIndex, setTrackIndex] = useState(null) // null = player hidden
   const [playing, setPlaying] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(0.6)
@@ -365,17 +368,23 @@ export default function Works({ projects, music, loadFailed, worksTab, onTabChan
       setPlaying(false)
       setCurrentTime(0)
     }
+    const onError = () => {
+      setPlaying(false)
+      setFailed(true)
+    }
     el.addEventListener('play', onPlay)
     el.addEventListener('pause', onPause)
     el.addEventListener('timeupdate', onTime)
     el.addEventListener('loadedmetadata', onMeta)
     el.addEventListener('ended', onEnded)
+    el.addEventListener('error', onError)
     return () => {
       el.removeEventListener('play', onPlay)
       el.removeEventListener('pause', onPause)
       el.removeEventListener('timeupdate', onTime)
       el.removeEventListener('loadedmetadata', onMeta)
       el.removeEventListener('ended', onEnded)
+      el.removeEventListener('error', onError)
     }
   }, [])
 
@@ -386,13 +395,14 @@ export default function Works({ projects, music, loadFailed, worksTab, onTabChan
   // Nothing plays until the visitor clicks a track
   const playTrack = (i) => {
     const el = audioRef.current
-    if (!el) return
-    if (i === trackIndex) {
+    if (!el || !music[i].audio) return
+    if (i === trackIndex && !failed) {
       if (el.paused) el.play().catch(() => {})
       else el.pause()
       return
     }
     setTrackIndex(i)
+    setFailed(false)
     setCurrentTime(0)
     setDuration(0)
     el.src = music[i].audio
@@ -471,25 +481,29 @@ export default function Works({ projects, music, loadFailed, worksTab, onTabChan
         <audio ref={audioRef} preload="none" />
       </div>
 
-      {trackIndex !== null && (
-        <PlayerBar
-          track={music[trackIndex]}
-          playing={playing}
-          currentTime={currentTime}
-          duration={duration}
-          volume={volume}
-          onToggle={() => playTrack(trackIndex)}
-          onSeek={(e) => {
-            const t = parseFloat(e.target.value)
-            audioRef.current.currentTime = t
-            setCurrentTime(t)
-          }}
-          onVolume={(e) => setVolume(parseFloat(e.target.value))}
-          onClose={closePlayer}
-        />
-      )}
+      {/* Portaled out of the page so it stays usable while a project page is open */}
+      {trackIndex !== null &&
+        createPortal(
+          <PlayerBar
+            track={music[trackIndex]}
+            playing={playing}
+            failed={failed}
+            currentTime={currentTime}
+            duration={duration}
+            volume={volume}
+            onToggle={() => playTrack(trackIndex)}
+            onSeek={(e) => {
+              const t = parseFloat(e.target.value)
+              audioRef.current.currentTime = t
+              setCurrentTime(t)
+            }}
+            onVolume={(e) => setVolume(parseFloat(e.target.value))}
+            onClose={closePlayer}
+          />,
+          document.body,
+        )}
 
-      {detailIndex !== null && (
+      {detailIndex !== null && !pageHidden && (
         <TrackModal
           track={music[detailIndex]}
           active={trackIndex === detailIndex}

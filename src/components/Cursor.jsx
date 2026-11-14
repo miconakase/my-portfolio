@@ -82,32 +82,21 @@ export default function Cursor() {
     if (!cursor) return
 
     const root = document.documentElement
+    // The page is zoomed (App.css), so mouse coordinates are scaled back up by this
+    const zoom = parseFloat(getComputedStyle(root).getPropertyValue('--cursor-zoom-inverse')) || 1
 
     let mouseX = 0, mouseY = 0
     let onInput = false
     let onInteractive = false
-    let hidden = false
-    let rafId
+    let hidden = true // until the mouse first moves, so it never sits at the corner
+    let rafId = 0
 
     const INPUT_SEL = 'input:not([type="range"]), textarea, [contenteditable]'
     const CLICK_SEL = 'a, button, input[type="range"], [role="button"], [role="link"], [role="tab"]'
 
-    const onMove = (e) => {
-      mouseX = e.clientX
-      mouseY = e.clientY
-    }
-    const onLeave = () => { hidden = true }
-    const onEnter = () => { hidden = false }
-    const onDown = () => cursor.classList.add('cursor--down')
-    const onUp = () => cursor.classList.remove('cursor--down')
-
-    document.addEventListener('mousemove', onMove, { passive: true })
-    document.addEventListener('mouseleave', onLeave, { passive: true })
-    document.addEventListener('mouseenter', onEnter, { passive: true })
-    document.addEventListener('mousedown', onDown, { passive: true })
-    document.addEventListener('mouseup', onUp, { passive: true })
-
-    const loop = () => {
+    // Only does work on frames where something changed (mouse moved, page scrolled)
+    const update = () => {
+      rafId = 0
       const elem = document.elementFromPoint(mouseX, mouseY)
       if (elem) {
         const isNowInput = elem.closest(INPUT_SEL) !== null
@@ -126,30 +115,50 @@ export default function Cursor() {
         }
       }
 
-      const zoom = parseFloat(getComputedStyle(root).getPropertyValue('--cursor-zoom-inverse')) || 1
-
       cursor.style.left = (mouseX * zoom) + 'px'
       cursor.style.top = (mouseY * zoom) + 'px'
       cursor.style.opacity = hidden ? '0' : '1'
-
-      rafId = requestAnimationFrame(loop)
+    }
+    const schedule = () => {
+      if (!rafId) rafId = requestAnimationFrame(update)
     }
 
-    rafId = requestAnimationFrame(loop)
+    const onMove = (e) => {
+      mouseX = e.clientX
+      mouseY = e.clientY
+      hidden = false
+      schedule()
+    }
+    const onLeave = () => {
+      hidden = true
+      schedule()
+    }
+    const onDown = () => cursor.classList.add('cursor--down')
+    // A click can open or close things under a still mouse, so re-check after it
+    const onUp = () => {
+      cursor.classList.remove('cursor--down')
+      setTimeout(schedule, 50)
+    }
+
+    document.addEventListener('mousemove', onMove, { passive: true })
+    document.addEventListener('mouseleave', onLeave, { passive: true })
+    document.addEventListener('mousedown', onDown, { passive: true })
+    document.addEventListener('mouseup', onUp, { passive: true })
+    window.addEventListener('scroll', schedule, { passive: true })
 
     return () => {
       cancelAnimationFrame(rafId)
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseleave', onLeave)
-      document.removeEventListener('mouseenter', onEnter)
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('mouseup', onUp)
+      window.removeEventListener('scroll', schedule)
       root.style.cursor = ''
     }
   }, [])
 
   return (
-    <span className="cursor" ref={cursorRef}>
+    <span className="cursor" ref={cursorRef} style={{ opacity: 0 }}>
       <Sprite rects={ARROW_RECTS} cols={12} rows={19} className="cursor-arrow" />
       <Sprite rects={HAND_RECTS} cols={16} rows={17} className="cursor-hand" />
     </span>

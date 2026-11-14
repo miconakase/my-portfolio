@@ -175,7 +175,6 @@
 
 html {
   zoom: 0.8;
-  cursor: none;
   scroll-behavior: smooth;
   font-size: 18px;
   --cursor-zoom-inverse: 1.25;
@@ -187,18 +186,25 @@ html::-webkit-scrollbar {
   display: none;
 }
 
-/* Hide the system cursor everywhere — buttons/links set `cursor: pointer`
-   on themselves, which would otherwise show the OS hand over the pixel one */
-html *,
-html *::before,
-html *::after {
-  cursor: none !important;
-}
+/* With a mouse, hide the system cursor everywhere so the pixel one (Cursor.jsx) shows.
+   Buttons/links set `cursor: pointer` on themselves, which would otherwise show the
+   OS hand over it. Touch screens keep their defaults. */
+@media (hover: hover) and (pointer: fine) {
+  html {
+    cursor: none;
+  }
 
-input:not([type='range']),
-textarea,
-[contenteditable] {
-  cursor: text !important;
+  html *,
+  html *::before,
+  html *::after {
+    cursor: none !important;
+  }
+
+  input:not([type='range']),
+  textarea,
+  [contenteditable] {
+    cursor: text !important;
+  }
 }
 
 body {

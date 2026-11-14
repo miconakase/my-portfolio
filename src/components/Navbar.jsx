@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+import { useModal } from '../hooks/useModal'
 import Icon from './Icon'
 
 const NAV_ITEMS = [
@@ -10,6 +12,9 @@ const NAV_ITEMS = [
 ]
 
 export default function Navbar({ menuOpen, onToggleMenu, theme, onToggleTheme, activeSection, onOpenTerminal }) {
+  const menuRef = useRef(null)
+  useModal(menuRef, onToggleMenu, { active: menuOpen })
+
   const handleNav = (id) => {
     if (id === 'home') window.scrollTo({ top: 0, behavior: 'smooth' })
     else document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
@@ -100,8 +105,12 @@ export default function Navbar({ menuOpen, onToggleMenu, theme, onToggleTheme, a
 
       {menuOpen && (
         <div
+          ref={menuRef}
           className="fixed inset-0 z-99 bg-(--color-bg)/90 flex items-center justify-center px-4 animate-menu-fade"
           onClick={onToggleMenu}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
         >
           {/* Battle-menu style picker */}
           <ul className="nb-dialog list-none m-0 p-8 grid grid-cols-2 gap-x-8 gap-y-6 w-full max-w-[460px]">
