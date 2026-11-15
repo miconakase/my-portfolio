@@ -17,7 +17,7 @@ const MAX_HISTORY = 8 // earlier messages are dropped to save tokens
 // serverless instances. The daily cap stays under Groq's free 1,000 requests a day per model.
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
-const MAX_PER_IP_HOUR = 20
+const MAX_PER_IP_HOUR = 40 // generous: PH mobile networks and school Wi-Fi share one IP across many people
 const MAX_TOTAL_DAY = 1800
 
 const PERSONA = `You are Mokusei AI, the assistant living in the terminal of Mico Nakase's portfolio site. Visitors chat with you to learn about Mico: projects, skills, experience, music and how to get in touch.
