@@ -20,6 +20,28 @@ const TONES = {
 const BLANK = { text: '' }
 const CHAT_EXIT = ['/exit', 'exit', '/quit', 'quit']
 
+// URLs and emails in Mokusei AI's replies, without trailing punctuation
+const LINK = /(https?:\/\/[^\s<>"“”]*[^\s<>"“”.,!?;:)'’]|[\w.+-]+@[\w-]+(?:\.[\w-]+)+)/g
+
+// split() with a capturing group puts the matches at the odd indexes
+function linkify(text) {
+  return text.split(LINK).map((part, i) => {
+    if (i % 2 === 0) return part
+    const web = part.startsWith('http')
+    return (
+      <a
+        key={i}
+        href={web ? part : `mailto:${part}`}
+        target={web ? '_blank' : undefined}
+        rel="noopener noreferrer"
+        className="text-[#7fb2ff] underline underline-offset-2"
+      >
+        {part}
+      </a>
+    )
+  })
+}
+
 const WINDOW_BUTTON =
   'flex items-center justify-center w-7 h-7 border-2 border-[#111] bg-white text-black font-pixel text-[10px] cursor-pointer'
 
@@ -122,6 +144,15 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
       setLines((l) => [...l, echo])
       ask(value, chat)
     }
+  }
+
+  // A clicked suggestion is asked as if it were typed, starting a chat if needed
+  const askSuggestion = (question) => {
+    if (thinking) return
+    if (!chat) setChat([])
+    setHistory((h) => [...h, question])
+    setLines((l) => [...l, { text: `mokusei> ${question}`, tone: 'input' }])
+    ask(question, chat ?? [])
   }
 
   const submit = (e) => {
@@ -228,9 +259,18 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
               >
                 {line.text}
               </a>
+            ) : line.suggest ? (
+              <button
+                key={i}
+                type="button"
+                onClick={() => askSuggestion(line.suggest)}
+                className="block text-left whitespace-pre-wrap break-words text-[#7fb2ff] hover:underline underline-offset-2 cursor-pointer"
+              >
+                {line.text}
+              </button>
             ) : (
               <div key={i} className={`whitespace-pre-wrap break-words min-h-[1.6em] ${TONES[line.tone] ?? ''}`}>
-                {line.text}
+                {line.tone === 'ai' ? linkify(line.text) : line.text}
               </div>
             ),
           )}

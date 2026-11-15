@@ -5,19 +5,20 @@ import { COLLECTIONS } from './_lib/collections.js'
 import { handle, methodNotAllowed } from './_lib/http.js'
 import { buildPortfolio } from './_lib/portfolio.js'
 
-// Groq speaks the OpenAI chat format; see console.groq.com for the current model list
+// Groq speaks the OpenAI chat format; see console.groq.com for the current model list.
+// Each model has its own free limits, so when the first is busy the smaller one answers.
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = process.env.MOKUSEI_MODEL || 'openai/gpt-oss-120b'
+const MODELS = [...new Set([process.env.MOKUSEI_MODEL || 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'])]
 
 const MAX_MESSAGE = 500
 const MAX_HISTORY = 8 // earlier messages are dropped to save tokens
 
 // Requests are logged in Mongo (auto-deleted after a day) so the limits hold across
-// serverless instances. The daily cap stays under Groq's free 1,000 requests a day.
+// serverless instances. The daily cap stays under Groq's free 1,000 requests a day per model.
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
 const MAX_PER_IP_HOUR = 20
-const MAX_TOTAL_DAY = 900
+const MAX_TOTAL_DAY = 1800
 
 const PERSONA = `You are Mokusei AI, the assistant living in the terminal of Mico Nakase's portfolio site. Visitors chat with you to learn about Mico: projects, skills, experience, music and how to get in touch.
 
@@ -123,19 +124,22 @@ export default handle(async (req, res) => {
   ]
 
   let llm
-  try {
-    llm = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, messages, reasoning_effort: 'low', max_completion_tokens: 700 }),
-      signal: AbortSignal.timeout(20_000),
-    })
-  } catch (err) {
-    console.error('chat: Groq unreachable', err)
-    return res.status(504).json({ error: 'Mokusei AI took too long to answer. Try again.' })
+  for (const model of MODELS) {
+    try {
+      llm = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, reasoning_effort: 'low', max_completion_tokens: 700 }),
+        signal: AbortSignal.timeout(15_000),
+      })
+    } catch (err) {
+      console.error('chat: Groq unreachable', err)
+      return res.status(504).json({ error: 'Mokusei AI took too long to answer. Try again.' })
+    }
+    // Groq's per-minute token limit is shared by every visitor; 429 means try the next model
+    if (llm.status !== 429) break
   }
 
-  // Groq's per-minute token limit is shared by every visitor
   if (llm.status === 429) return res.status(503).json({ error: 'Mokusei AI is busy right now. Try again in a minute.' })
   if (!llm.ok) {
     console.error('chat: Groq error', llm.status, await llm.text())

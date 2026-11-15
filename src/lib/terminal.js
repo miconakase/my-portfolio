@@ -10,11 +10,16 @@ const SECTIONS = ['home', 'about', 'works', 'timeline', 'skills', 'contact']
 const text = (value, tone) => ({ text: value, tone })
 const link = (label, href) => ({ text: label, href })
 const error = (value) => text(value, 'error')
+// A question the visitor can click to ask Mokusei AI
+const suggest = (question) => ({ text: `  › ${question}`, suggest: question })
 
 // Printed when a Mokusei AI chat starts (and again on /clear)
 export const MOKUSEI_BANNER = [
   text('MOKUSEI AI · portfolio assistant', 'accent'),
-  text("Ask me anything about Mico's projects, skills, music or journey.", 'muted'),
+  text("Ask me anything about Mico's projects, skills, music or journey. Try:", 'muted'),
+  suggest("What's Mico's strongest project?"),
+  suggest('Ano ang mga kanta ni Mico?'),
+  suggest('How can I work with Mico?'),
   text('/clear starts over · /exit goes back to the shell', 'muted'),
 ]
 
