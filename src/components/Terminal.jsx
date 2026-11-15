@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { complete, MOKUSEI_BANNER, runCommand } from '../lib/terminal'
+import { complete, MOKUSEI_BANNER, replyAction, runCommand, visibleReply } from '../lib/terminal'
 import { askMokusei } from '../services/chatService'
 import { useModal } from '../hooks/useModal'
 
@@ -19,6 +19,12 @@ const TONES = {
 
 const BLANK = { text: '' }
 const CHAT_EXIT = ['/exit', 'exit', '/quit', 'quit']
+
+// Replies are typed out at about 180 characters a second; Groq often sends a whole
+// reply in a blink, so streaming alone wouldn't look like typing
+const CHARS_PER_FRAME = 3
+// Long enough to read the reply before Mokusei AI jumps to what it opened
+const ACTION_DELAY = 900
 
 // URLs and emails in Mokusei AI's replies, without trailing punctuation
 const LINK = /(https?:\/\/[^\s<>"“”]*[^\s<>"“”.,!?;:)'’]|[\w.+-]+@[\w-]+(?:\.[\w-]+)+)/g
@@ -55,6 +61,7 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
   // null in the shell; the conversation so far while chatting with Mokusei AI
   const [chat, setChat] = useState(null)
   const [thinking, setThinking] = useState(false)
+  const [typed, setTyped] = useState('') // the part of Mokusei AI's reply typed out so far
   const [minimized, setMinimized] = useState(false) // closed, but waiting in the dock
   const [maximized, setMaximized] = useState(false)
   const inputRef = useRef(null)
@@ -89,7 +96,7 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
 
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight)
-  }, [lines, open, thinking])
+  }, [lines, open, thinking, typed])
 
   // ✕, Esc and commands that jump to the page close for real; ▁ keeps a button in the dock
   const close = () => {
@@ -118,15 +125,53 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
     )
   }
 
+  // Mokusei AI asked to run a command: show its output, then minimize so the visitor sees
+  // the page and can pop back into the chat from the dock
+  const runAction = (command) => {
+    const result = runCommand(command, ctx)
+    if (result.lines.length) setLines((l) => [...l, ...result.lines, BLANK])
+    if (result.action) {
+      setTimeout(() => {
+        minimize()
+        requestAnimationFrame(result.action)
+      }, ACTION_DELAY)
+    }
+  }
+
   const ask = async (question, conversation) => {
     setThinking(true)
+    let raw = ''
+    let received = false
+    let stopped = false
+    // Types out whatever has streamed in so far, until all of it is shown
+    const typedOut = new Promise((resolve) => {
+      let shown = 0
+      const tick = () => {
+        if (stopped) return resolve()
+        const text = visibleReply(raw)
+        shown = Math.min(text.length, shown + CHARS_PER_FRAME)
+        setTyped(text.slice(0, shown))
+        if (received && shown === text.length) resolve()
+        else requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+
     try {
-      const reply = await askMokusei(question, conversation)
-      setLines((l) => [...l, { text: reply, tone: 'ai' }, BLANK])
+      raw = await askMokusei(question, conversation, (soFar) => (raw = soFar))
+      received = true
+      await typedOut
+      const reply = visibleReply(raw)
+      const action = replyAction(raw)
+      if (!reply && !action) throw new Error('Mokusei AI went quiet. Try asking again.')
+      if (reply) setLines((l) => [...l, { text: reply, tone: 'ai' }, BLANK])
       setChat([...conversation, { role: 'user', content: question }, { role: 'assistant', content: reply }])
+      if (action) runAction(action)
     } catch (err) {
       setLines((l) => [...l, { text: err.message, tone: 'error' }, BLANK])
     } finally {
+      stopped = true
+      setTyped('')
       setThinking(false)
     }
   }
@@ -275,10 +320,14 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
             ),
           )}
 
-          {thinking && (
-            <div className={TONES.muted}>
-              Mokusei AI is thinking<span className="animate-dot-pulse">...</span>
-            </div>
+          {typed ? (
+            <div className={`whitespace-pre-wrap break-words ${TONES.ai}`}>{linkify(typed)}</div>
+          ) : (
+            thinking && (
+              <div className={TONES.muted}>
+                Mokusei AI is thinking<span className="animate-dot-pulse">...</span>
+              </div>
+            )
           )}
 
           <form onSubmit={submit} className="flex items-center gap-2">

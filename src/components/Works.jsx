@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useInView } from '../hooks/useInView'
 import { useModal } from '../hooks/useModal'
@@ -344,8 +344,9 @@ function PlayerBar({ track, playing, failed, currentTime, duration, volume, onTo
   )
 }
 
-// `pageHidden` = a project page is covering this section
-export default function Works({ projects, music, loadFailed, worksTab, onTabChange, onSelectWork, pageHidden }) {
+// `pageHidden` = a project page is covering this section; `playerRef` gets { play(index) }
+// so the terminal can start a track
+export default function Works({ projects, music, loadFailed, worksTab, onTabChange, onSelectWork, pageHidden, playerRef }) {
   const visible = useInView('works', 0.1)
   const audioRef = useRef(null)
   const [trackIndex, setTrackIndex] = useState(null) // null = player hidden
@@ -408,6 +409,13 @@ export default function Works({ projects, music, loadFailed, worksTab, onTabChan
     el.src = music[i].audio
     el.play().catch(() => {})
   }
+
+  // The terminal's "play": start the track, unless it's already playing (playTrack would pause it)
+  useImperativeHandle(playerRef, () => ({
+    play: (i) => {
+      if (i !== trackIndex || !playing) playTrack(i)
+    },
+  }))
 
   const closePlayer = () => {
     audioRef.current?.pause()

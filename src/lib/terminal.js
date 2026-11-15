@@ -30,6 +30,14 @@ function findProject(projects, query) {
   return projects.find((p) => p.slug === query)
 }
 
+// A track's index by its list number or (part of) its title; -1 if none
+function findTrack(music, query) {
+  const index = Number(query)
+  if (Number.isInteger(index) && index >= 1 && index <= music.length) return index - 1
+  const q = query.toLowerCase()
+  return music.findIndex((t) => t.title.toLowerCase().includes(q))
+}
+
 const COMMANDS = {
   help: {
     desc: 'List the commands',
@@ -98,13 +106,28 @@ const COMMANDS = {
       if (!ctx.content.music.length) return [text('No tracks loaded yet.', 'muted')]
       return {
         lines: [
-          ...ctx.content.music.map((t) =>
-            text(`  ♪ ${t.title}${t.genre ? ` · ${t.genre}` : ''}${t.year ? ` · ${t.year}` : ''}${t.award ? `  🏆 ${t.award}` : ''}`),
+          ...ctx.content.music.map((t, i) =>
+            text(`  ${String(i + 1).padStart(2)}. ♪ ${t.title}${t.genre ? ` · ${t.genre}` : ''}${t.year ? ` · ${t.year}` : ''}${t.award ? `  🏆 ${t.award}` : ''}`),
           ),
           text(''),
-          text('Type "listen" to go to the music tab.', 'muted'),
+          text('Type "play <number>" to play one, or "listen" to go to the music tab.', 'muted'),
         ],
       }
+    },
+  },
+  play: {
+    usage: '<number|title>',
+    desc: 'Play one of my tracks',
+    run: (args, ctx) => {
+      const query = args.join(' ')
+      if (!query) return [error('play: which track? e.g. "play 1". Type "music" for the list.')]
+      const index = findTrack(ctx.content.music, query)
+      if (index === -1) return [error(`play: no track "${query}". Type "music" to see the list.`)]
+      const track = ctx.content.music[index]
+      if (!track.audio) {
+        return { lines: [text(`${track.title} isn't playable yet. Opening the music tab...`, 'muted')], action: () => ctx.showMusic() }
+      }
+      return { lines: [text(`♪ Playing ${track.title}...`)], action: () => ctx.playTrack(index) }
     },
   },
   listen: {
@@ -187,6 +210,24 @@ const ALIASES = {
 }
 
 export const COMMAND_NAMES = Object.keys(COMMANDS).filter((name) => !COMMANDS[name].hidden)
+
+// Mokusei AI runs a command by ending its reply with a tag like [[open 2]] (see api/chat.js)
+const MOKUSEI_ACTIONS = ['open', 'play', 'listen', 'cd', 'theme']
+
+// What the visitor sees of a reply, even half-streamed: no action tag (or the start of
+// one) and no markdown, which the terminal can't render
+export function visibleReply(raw) {
+  return raw
+    .replace(/\[\[[\s\S]*$|\[$/, '')
+    .replace(/\*\*|__|`/g, '')
+    .trim()
+}
+
+// The command a finished reply asks for, if it's one Mokusei AI may run
+export function replyAction(raw) {
+  const command = raw.match(/\[\[([^\]]+)\]\]/)?.[1].trim()
+  return command && MOKUSEI_ACTIONS.includes(command.split(/\s+/)[0].toLowerCase()) ? command : null
+}
 
 // Runs one input line; always returns { lines, action?, clear?, chat?, ask? }
 export function runCommand(input, ctx) {

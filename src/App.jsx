@@ -35,6 +35,7 @@ function App() {
   const [worksTab, setWorksTab] = useState('programming')
   const [selectedSlug, setSelectedSlug] = useState(slugFromHash)
   const [terminalOpen, setTerminalOpen] = useState(false)
+  const playerRef = useRef(null) // Works' music player, for the terminal's "play"
   const openedFromList = useRef(false)
   const wasOpen = useRef(false)
   const { theme, toggle: toggleTheme } = useTheme()
@@ -103,6 +104,11 @@ function App() {
       setWorksTab('music')
       goTo('works')
     },
+    playTrack: (index) => {
+      setWorksTab('music')
+      playerRef.current?.play(index)
+      goTo('works')
+    },
   }
 
   useEffect(() => {
@@ -158,6 +164,7 @@ function App() {
           onTabChange={setWorksTab}
           onSelectWork={openWork}
           pageHidden={selectedWork !== null}
+          playerRef={playerRef}
         />
         <Timeline journey={content.journey} />
         <Skills party={content.skills.party} box={content.skills.box} boxCount={content.skills.boxCount} />
