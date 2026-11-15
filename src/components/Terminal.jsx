@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { complete, runCommand } from '../lib/terminal'
+import { complete, MOKUSEI_BANNER, runCommand } from '../lib/terminal'
+import { askMokusei } from '../services/chatService'
 import { useModal } from '../hooks/useModal'
 
 const WELCOME = [
   { text: 'MICO OS v1.0 — portfolio terminal', tone: 'accent' },
-  { text: 'Type "help" to see what you can do.', tone: 'muted' },
+  { text: 'Type "help" to see what you can do, or "mokusei" to chat with Mokusei AI.', tone: 'muted' },
   { text: '' },
 ]
 
@@ -13,7 +14,11 @@ const TONES = {
   error: 'text-[#ff7a5c]',
   muted: 'text-[#9a968a]',
   input: 'text-white',
+  ai: 'border-l-2 border-(--color-yellow) pl-3',
 }
+
+const BLANK = { text: '' }
+const CHAT_EXIT = ['/exit', 'exit', '/quit', 'quit']
 
 // Opens with ~ or Ctrl/Cmd+K (or the navbar button). `ctx` gives commands the
 // content and the actions they can trigger on the page.
@@ -22,8 +27,12 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
   const [input, setInput] = useState('')
   const [history, setHistory] = useState([])
   const [historyIndex, setHistoryIndex] = useState(-1) // -1 = typing a new line
+  // null in the shell; the conversation so far while chatting with Mokusei AI
+  const [chat, setChat] = useState(null)
+  const [thinking, setThinking] = useState(false)
   const inputRef = useRef(null)
   const scrollRef = useRef(null)
+  const prompt = chat ? 'mokusei>' : '>'
 
   // Global shortcuts: ~ (outside form fields) and Ctrl/Cmd+K toggle, Esc closes
   useEffect(() => {
@@ -50,24 +59,59 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
 
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight)
-  }, [lines, open])
+  }, [lines, open, thinking])
 
   if (!open) return null
 
+  const ask = async (question, conversation) => {
+    setThinking(true)
+    try {
+      const reply = await askMokusei(question, conversation)
+      setLines((l) => [...l, { text: reply, tone: 'ai' }, BLANK])
+      setChat([...conversation, { role: 'user', content: question }, { role: 'assistant', content: reply }])
+    } catch (err) {
+      setLines((l) => [...l, { text: err.message, tone: 'error' }, BLANK])
+    } finally {
+      setThinking(false)
+    }
+  }
+
+  // Inside a chat everything goes to Mokusei AI, apart from the slash commands
+  const sendToChat = (value, echo) => {
+    const command = value.toLowerCase()
+    if (CHAT_EXIT.includes(command)) {
+      setChat(null)
+      setLines((l) => [...l, echo, { text: 'Back to MICO OS.', tone: 'muted' }, BLANK])
+    } else if (command === '/clear') {
+      setChat([])
+      setLines([...MOKUSEI_BANNER, BLANK])
+    } else {
+      setLines((l) => [...l, echo])
+      ask(value, chat)
+    }
+  }
+
   const submit = (e) => {
     e.preventDefault()
+    if (thinking) return
     const value = input.trim()
     setInput('')
     setHistoryIndex(-1)
-    const echo = { text: `> ${input}`, tone: 'input' }
+    const echo = { text: `${prompt} ${input}`, tone: 'input' }
     if (!value) {
       setLines((l) => [...l, echo])
       return
     }
     setHistory((h) => [...h, value])
+    if (chat) return sendToChat(value, echo)
+
     const result = runCommand(value, ctx)
     if (result.clear) setLines([])
-    else setLines((l) => [...l, echo, ...result.lines, { text: '' }])
+    else setLines((l) => [...l, echo, ...result.lines, BLANK])
+    if (result.chat) {
+      setChat([])
+      if (result.ask) ask(result.ask, [])
+    }
     if (result.action) {
       onClose()
       // Let the overlay unmount first so scrolling targets the page
@@ -78,7 +122,7 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
   const onInputKey = (e) => {
     if (e.key === 'Tab') {
       e.preventDefault()
-      const completed = complete(input)
+      const completed = !chat && complete(input)
       if (completed) setInput(completed)
     } else if (e.key === 'ArrowUp' && history.length) {
       e.preventDefault()
@@ -109,7 +153,7 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
         <div className="flex items-center justify-between gap-3 px-3 py-2 bg-(--color-yellow) text-(--color-on-accent) border-b-[3px] border-[#111]">
           <span className="flex items-center gap-2 font-pixel text-[10px] uppercase">
             <span className="pokeball text-[14px]" aria-hidden="true" />
-            mico@portfolio: ~
+            mico@portfolio: ~{chat && '/mokusei'}
           </span>
           <button
             type="button"
@@ -140,9 +184,15 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
             ),
           )}
 
+          {thinking && (
+            <div className={TONES.muted}>
+              Mokusei AI is thinking<span className="animate-dot-pulse">...</span>
+            </div>
+          )}
+
           <form onSubmit={submit} className="flex items-center gap-2">
-            <span className="text-(--color-green)" aria-hidden="true">
-              &gt;
+            <span className={chat ? 'text-(--color-yellow)' : 'text-(--color-green)'} aria-hidden="true">
+              {prompt}
             </span>
             <input
               ref={inputRef}
@@ -150,7 +200,9 @@ export default function Terminal({ open, onOpen, onClose, ctx }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onInputKey}
-              aria-label="Command"
+              readOnly={thinking}
+              placeholder={chat ? 'Ask about Mico…' : undefined}
+              aria-label={chat ? 'Message Mokusei AI' : 'Command'}
               autoComplete="off"
               autoCapitalize="off"
               spellCheck="false"

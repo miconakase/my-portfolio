@@ -1,22 +1,22 @@
 // Commands for the terminal overlay. Each one gets the arguments and a context
 // (content + actions from App) and returns the lines to print; it can also set
-// `action` to run once the terminal closes (scrolling, opening a project...).
+// `action` to run once the terminal closes (scrolling, opening a project...), or `chat` to
+// switch the terminal into a Mokusei AI conversation.
 import { calcLevel } from '../hooks/useDuration'
+import { EMAIL, SOCIALS } from '../constants/profile'
 
 const SECTIONS = ['home', 'about', 'works', 'timeline', 'skills', 'contact']
-
-const SOCIALS = [
-  ['github', 'https://github.com/miconakase'],
-  ['linkedin', 'https://www.linkedin.com/in/mico-nakase-0835b1391/'],
-  ['facebook', 'https://www.facebook.com/mics12345'],
-  ['instagram', 'https://www.instagram.com/itsmicssss_/'],
-  ['tiktok', 'https://www.tiktok.com/@micodevph'],
-]
-const EMAIL = 'miconakaseyt@gmail.com'
 
 const text = (value, tone) => ({ text: value, tone })
 const link = (label, href) => ({ text: label, href })
 const error = (value) => text(value, 'error')
+
+// Printed when a Mokusei AI chat starts (and again on /clear)
+export const MOKUSEI_BANNER = [
+  text('MOKUSEI AI · portfolio assistant', 'accent'),
+  text("Ask me anything about Mico's projects, skills, music or journey.", 'muted'),
+  text('/clear starts over · /exit goes back to the shell', 'muted'),
+]
 
 // A project by its list number or slug
 function findProject(projects, query) {
@@ -44,6 +44,11 @@ const COMMANDS = {
       text('Full Stack & Gen AI developer from San Pedro, Laguna, PH.'),
       text('Junior AI Engineer at Prosperna. Builds web apps by day, produces music by night.'),
     ],
+  },
+  mokusei: {
+    usage: '[question]',
+    desc: 'Chat with Mokusei AI',
+    run: (args) => ({ lines: MOKUSEI_BANNER, chat: true, ask: args.join(' ') }),
   },
   ls: {
     desc: 'List the sections',
@@ -163,11 +168,22 @@ const COMMANDS = {
 }
 
 // Aliases so the obvious guesses work too
-const ALIASES = { about: 'whoami', '?': 'help', timeline: 'journey', email: 'contact', tracks: 'music', quit: 'exit', cls: 'clear', hi: 'hello' }
+const ALIASES = {
+  about: 'whoami',
+  '?': 'help',
+  timeline: 'journey',
+  email: 'contact',
+  tracks: 'music',
+  quit: 'exit',
+  cls: 'clear',
+  hi: 'hello',
+  ai: 'mokusei',
+  chat: 'mokusei',
+}
 
 export const COMMAND_NAMES = Object.keys(COMMANDS).filter((name) => !COMMANDS[name].hidden)
 
-// Runs one input line; always returns { lines, action?, clear? }
+// Runs one input line; always returns { lines, action?, clear?, chat?, ask? }
 export function runCommand(input, ctx) {
   const [rawName, ...args] = input.trim().split(/\s+/)
   const name = ALIASES[rawName.toLowerCase()] ?? rawName.toLowerCase()
